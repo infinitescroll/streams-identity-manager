@@ -34,21 +34,22 @@ const getConsent = (ceramicReq, expressReq) =>
 
 // this is pretty tightly coupled with email auth for now...
 router.post("/create-user", async (expressReq, res) => {
-  const db = level("streams-did-mappings");
   const { email } = expressReq.body;
   if (!validateEmail(email)) res.send("Error").status(404);
-  db.get(`email:${email}`, async (err, did) => {
-    if (!err instanceof level.errors.NotFoundError) {
-      // send and validate a consent email
-      // upon consent, issue JWT
-      res.send("User already exists").status(201);
+  const db = level("streams-did-mappings");
+  db.get(`email:${email}`, async (err, { id }) => {
+    // some issue with level-db
+    if (!(err && err instanceof level.errors.NotFoundError)) {
+      return res.send(err.message).status(err.status);
     }
-    const ipfs = IpfsHttpClient({ url: IPFS_URL });
 
-    const ceramicConfig = {
-      stateStorePath: "./ceramic.lvl",
-    };
-    const ceramic = await Ceramic.create(ipfs, { ...ceramicConfig });
+    // user already exists, just send back their DID
+    if (id) {
+      return res.send(id).status(201);
+    }
+
+    const ipfs = IpfsHttpClient({ url: IPFS_URL });
+    const ceramic = await Ceramic.create(ipfs);
 
     const seed = getNewSeed();
     // some funny req scoping concepts at play here...
@@ -68,12 +69,51 @@ router.post("/create-user", async (expressReq, res) => {
     });
 
     // create a mapping to this DID from the email address
-    await db.put(`email:${email}`, did.id);
+    await db.put(`email:${email}`, { id: did.id, seed });
 
-    // this call triggers the `getConsent` function
-    await ceramic.setDIDProvider(idWallet.get3idProvider());
+    // // this call triggers the `getConsent` function
+    // await ceramic.setDIDProvider(idWallet.get3idProvider());
 
-    res.send("OWL").status(201);
+    res.send(did.id).status(201);
+  });
+});
+
+// The AUTH handlers here should **ALWAYS** return a JWT,
+// regardless of the underlying strategy
+
+router.post("/get-permission-via-email", async (req, res) => {
+  const { email } = expressReq.body;
+  if (!validateEmail(email)) res.send("Error").status(404);
+  const db = level("streams-did-mappings");
+
+  db.get(`email:${email}`, async (err, { id, seed }) => {
+    // some issue with level-db
+    if (err) {
+      return res.send(err.message).status(err.status);
+    }
+
+    // user already exists, just send back their DID
+    if (!id) {
+      return res.send(`User with email ${email} not found`).status(404);
+    }
+
+    const ipfs = IpfsHttpClient({ url: IPFS_URL });
+    const ceramic = await Ceramic.create(ipfs);
+
+    const idWallet = new IdentityWallet(
+      (ceramicReq) => getConsent(ceramicReq, expressReq),
+      {
+        seed,
+      }
+    );
+
+    try {
+      // this call triggers the `getConsent` function
+      await ceramic.setDIDProvider(idWallet.get3idProvider());
+      res.send(did.id).status(201);
+    } catch (err) {
+      res.send(err.message).status(err.code);
+    }
   });
 });
 
