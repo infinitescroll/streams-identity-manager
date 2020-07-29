@@ -37,44 +37,50 @@ router.post("/create-user", async (expressReq, res) => {
   const { email } = expressReq.body;
   if (!validateEmail(email)) res.send("Error").status(404);
   const db = level("streams-did-mappings");
-  db.get(`email:${email}`, async (err, { id }) => {
+  db.get(`email:${email}`, async (err, value) => {
     // some issue with level-db
-    if (!(err && err instanceof level.errors.NotFoundError)) {
+    if (err && !(err instanceof level.errors.NotFoundError)) {
+      console.log("yo");
       return res.send(err.message).status(err.status);
     }
 
-    // user already exists, just send back their DID
-    if (id) {
-      return res.send(id).status(201);
-    }
+    // user not found
+    if (err && err instanceof level.errors.NotFoundError) {
+      const ipfs = IpfsHttpClient({ url: IPFS_URL });
+      const ceramic = await Ceramic.create(ipfs, {
+        stateStorePath: "./ceramic.lvl",
+      });
 
-    const ipfs = IpfsHttpClient({ url: IPFS_URL });
-    const ceramic = await Ceramic.create(ipfs);
+      const seed = getNewSeed();
 
-    const seed = getNewSeed();
-    // some funny req scoping concepts at play here...
-    const idWallet = new IdentityWallet(
-      (ceramicReq) => getConsent(ceramicReq, expressReq),
-      {
+      // getConsent doesnt matter here, it never gets called
+      const idWallet = new IdentityWallet(() => true, {
         seed,
+      });
+
+      console.log("yo");
+      // this doc needs to be filled in properly
+      // waiting on OED's IDX package spec
+      const did = await ceramic.createDocument("3id", {
+        // ?
+        content: {},
+        // should be the management key of the seed generated for the ID wallet
+        owners: [],
+      });
+
+      console.log(did.id);
+
+      try {
+        // create a mapping to this DID from the email address
+        await db.put(`email:${email}`, { id: did.id, seed });
+      } catch (err) {
+        console.log("err", err);
       }
-    );
-    // this doc needs to be filled in properly
-    // waiting on OED's IDX package spec
-    const did = await ceramic.createDocument("3id", {
-      // ?
-      content: {},
-      // should be the management key of the seed generated for the ID wallet
-      owners: [],
-    });
 
-    // create a mapping to this DID from the email address
-    await db.put(`email:${email}`, { id: did.id, seed });
-
-    // // this call triggers the `getConsent` function
-    // await ceramic.setDIDProvider(idWallet.get3idProvider());
-
-    res.send(did.id).status(201);
+      res.send(did.id).status(201);
+    } else {
+      return value.id;
+    }
   });
 });
 
@@ -116,5 +122,8 @@ router.post("/get-permission-via-email", async (req, res) => {
     }
   });
 });
+
+// helper method for dev
+router.delete("/user", async (req, res) => {});
 
 module.exports = router;
