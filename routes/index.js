@@ -40,7 +40,6 @@ router.post("/create-user", async (expressReq, res) => {
   db.get(`email:${email}`, async (err, value) => {
     // some issue with level-db
     if (err && !(err instanceof level.errors.NotFoundError)) {
-      console.log("yo");
       return res.send(err.message).status(err.status);
     }
 
@@ -58,7 +57,6 @@ router.post("/create-user", async (expressReq, res) => {
         seed,
       });
 
-      console.log("yo");
       // this doc needs to be filled in properly
       // waiting on OED's IDX package spec
       const did = await ceramic.createDocument("3id", {
@@ -68,20 +66,20 @@ router.post("/create-user", async (expressReq, res) => {
         owners: [],
       });
 
-      console.log(did.id);
-
       try {
         // create a mapping to this DID from the email address
-        await db.put(`email:${email}`, { id: did.id, seed });
+        await db.put(`email:${email}`, JSON.stringify({ id: did.id, seed }));
       } catch (err) {
-        console.log("err", err);
+        return res.send(err.message).status(err.status);
       }
 
-      res.send(did.id).status(201);
+      return res.send(did.id).status(201);
     } else {
-      return value.id;
+      return res.send(JSON.parse(value).id).status(201);
     }
   });
+
+  await db.close();
 });
 
 // The AUTH handlers here should **ALWAYS** return a JWT,
