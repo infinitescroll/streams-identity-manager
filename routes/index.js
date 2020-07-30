@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Ceramic = require("@ceramicnetwork/ceramic-core").default;
 const IdentityWallet = require("identity-wallet");
+const Keyring = require("identity-wallet/lib/keyring");
 const IpfsHttpClient = require("ipfs-http-client");
 const crypto = require("crypto");
 const level = require("level");
@@ -43,27 +44,26 @@ router.post("/create-user", async (expressReq, res) => {
       return res.send(err.message).status(err.status);
     }
 
-    // user not found
+    // user DNE
     if (err && err instanceof level.errors.NotFoundError) {
       const ipfs = IpfsHttpClient({ url: IPFS_URL });
       const ceramic = await Ceramic.create(ipfs, {
         stateStorePath: "./ceramic.lvl",
       });
 
+      // this is the seed we will use to generate identity wallet
       const seed = getNewSeed();
-
-      // getConsent doesnt matter here, it never gets called
-      const idWallet = new IdentityWallet(() => true, {
-        seed,
-      });
-
+      const keyring = new Keyring(seed);
+      const { address } = keyring.managementWallet();
       // this doc needs to be filled in properly
       // waiting on OED's IDX package spec
       const did = await ceramic.createDocument("3id", {
-        // ?
-        content: {},
-        // should be the management key of the seed generated for the ID wallet
-        owners: [],
+        content: {
+          // pointer to the root index dociD
+          idx: "ceramic://rootindex",
+          // anything else?
+        },
+        owners: [address],
       });
 
       try {
