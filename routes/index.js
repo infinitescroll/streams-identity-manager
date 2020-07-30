@@ -23,6 +23,8 @@ const validateEmail = (email) => {
   return re.test(email);
 };
 
+const sendEmail = () => new Promise((resolve) => setTimeout(resolve, 1000));
+
 // this is pretty tightly coupled with email auth for now...
 router.post("/create-user", async (expressReq, res) => {
   const { email } = expressReq.body;
@@ -117,9 +119,9 @@ const getConsent = async (ceramicReq, expressReq, email, db) => {
 
 router.post("/get-permission-via-email", async (expressReq, res) => {
   const { email } = expressReq.body;
-  if (!validateEmail(email)) res.send("Error").status(404);
+  if (!validateEmail(email)) res.send("Error: invalid email").status(404);
+  sendEmail(email);
   const db = level("streams-did-mappings");
-
   db.get(`email:${email}`, async (err, v) => {
     const { id, seed } = JSON.parse(v);
     // some issue with level-db
