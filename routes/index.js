@@ -7,6 +7,8 @@ const IpfsHttpClient = require("ipfs-http-client");
 const crypto = require("crypto");
 const level = require("level");
 
+const { createJWT } = require("../utils/jwt-helpers");
+
 const IPFS_URL = process.env.IPFS_URL || "http://127.0.0.1:5001";
 const DB_POLL_INTERVAL = process.env.DB_POLL_INTERVAL || 1000;
 const EMAIL_CONFIRMATION_MAX_WAIT =
@@ -86,7 +88,6 @@ const userConfirmation = async (email, db) => {
       setTimeout(async () => {
         totalTime += DB_POLL_INTERVAL;
         const { auth } = JSON.parse(await db.get(`email:${email}`));
-        console.log(auth);
         if (auth) return resolve(true);
         if (totalTime < EMAIL_CONFIRMATION_MAX_WAIT) {
           return resolve(pollForAuth());
@@ -100,8 +101,10 @@ const userConfirmation = async (email, db) => {
 
 const getConsent = async (ceramicReq, expressReq, email, db) => {
   // im not sure why this would ever happen on the create-user request
-  if (expressReq.headers["Authorization"]) {
-    // jwt validation goes here
+  if (req.headers.authorization) {
+    // validate vals against db vals
+    const vals = verifyJWT(req.headers.authorization.split(" ")[1]);
+    // validate vals against email and db vals here
     return true;
   } else {
     try {
@@ -116,7 +119,6 @@ const getConsent = async (ceramicReq, expressReq, email, db) => {
 
 // The AUTH handlers here should **ALWAYS** return a JWT,
 // regardless of the underlying strategy
-
 router.post("/get-permission-via-email", async (expressReq, res) => {
   const { email } = expressReq.body;
   if (!validateEmail(email)) res.send("Error: invalid email").status(404);
@@ -153,7 +155,8 @@ router.post("/get-permission-via-email", async (expressReq, res) => {
       // but it is acting syncronously?
       // https://github.com/ceramicnetwork/js-ceramic/issues/191
       await ceramic.setDIDProvider(idWallet.get3idProvider());
-      res.send(id).status(201);
+      const jwt = await createJWT({ email, id });
+      res.send(jwt).status(201);
       // db.close(); <-- comment in when the above issue is fixed
     } catch (err) {
       res.send(err.message).status(err.code);
