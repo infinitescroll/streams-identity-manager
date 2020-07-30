@@ -8,6 +8,9 @@ const crypto = require("crypto");
 const level = require("level");
 
 const IPFS_URL = process.env.IPFS_URL || "http://127.0.0.1:5001";
+const DB_POLL_INTERVAL = process.env.DB_POLL_INTERVAL || 1000;
+const EMAIL_CONFIRMATION_MAX_WAIT =
+  process.env.EMAIL_CONFIRMATION_MAX_WAIT || 10000;
 
 router.get("/", (_, res) => {
   res.send("OWL");
@@ -20,19 +23,6 @@ const validateEmail = (email) => {
   return re.test(email);
 };
 
-const getConsent = (ceramicReq, expressReq) =>
-  new Promise((resolve, reject) => {
-    console.log("GETTING CONSENT", ceramicReq);
-    // im not sure why this would ever happen on the create-user request
-    if (expressReq.headers["Authorization"]) {
-      // jwt validation goes here
-      resolve(true);
-    } else {
-      // email validation goes here
-      resolve(true);
-    }
-  });
-
 // this is pretty tightly coupled with email auth for now...
 router.post("/create-user", async (expressReq, res) => {
   const { email } = expressReq.body;
@@ -41,6 +31,7 @@ router.post("/create-user", async (expressReq, res) => {
   db.get(`email:${email}`, async (err, value) => {
     // some issue with level-db
     if (err && !(err instanceof level.errors.NotFoundError)) {
+      await db.close();
       return res.send(err.message).status(err.status);
     }
 
@@ -68,57 +59,129 @@ router.post("/create-user", async (expressReq, res) => {
 
       try {
         // create a mapping to this DID from the email address
-        await db.put(`email:${email}`, JSON.stringify({ id: did.id, seed }));
+        await db.put(
+          `email:${email}`,
+          JSON.stringify({ id: did.id, seed, auth: false })
+        );
       } catch (err) {
+        await db.close();
         return res.send(err.message).status(err.status);
       }
 
+      await db.close();
       return res.send(did.id).status(201);
     } else {
+      await db.close();
       return res.send(JSON.parse(value).id).status(201);
     }
   });
-
-  await db.close();
 });
+
+const userConfirmation = async (email, db) => {
+  let totalTime = 0;
+  const pollForAuth = () =>
+    new Promise((resolve, reject) => {
+      setTimeout(async () => {
+        totalTime += DB_POLL_INTERVAL;
+        const { auth } = JSON.parse(await db.get(`email:${email}`));
+        console.log(auth);
+        if (auth) return resolve(true);
+        if (totalTime < EMAIL_CONFIRMATION_MAX_WAIT) {
+          return resolve(pollForAuth());
+        } else {
+          return reject("User did not confirm email in time");
+        }
+      }, DB_POLL_INTERVAL);
+    });
+  return pollForAuth();
+};
+
+const getConsent = async (ceramicReq, expressReq, email, db) => {
+  // im not sure why this would ever happen on the create-user request
+  if (expressReq.headers["Authorization"]) {
+    // jwt validation goes here
+    return true;
+  } else {
+    try {
+      const userConfirmed = await userConfirmation(email, db);
+      return userConfirmed;
+    } catch (err) {
+      // no consent if error happened?
+      return false;
+    }
+  }
+};
 
 // The AUTH handlers here should **ALWAYS** return a JWT,
 // regardless of the underlying strategy
 
-router.post("/get-permission-via-email", async (req, res) => {
+router.post("/get-permission-via-email", async (expressReq, res) => {
   const { email } = expressReq.body;
   if (!validateEmail(email)) res.send("Error").status(404);
   const db = level("streams-did-mappings");
 
-  db.get(`email:${email}`, async (err, { id, seed }) => {
+  db.get(`email:${email}`, async (err, v) => {
+    const { id, seed } = JSON.parse(v);
     // some issue with level-db
     if (err) {
+      db.close();
       return res.send(err.message).status(err.status);
     }
 
     // user already exists, just send back their DID
     if (!id) {
+      db.close();
       return res.send(`User with email ${email} not found`).status(404);
     }
 
     const ipfs = IpfsHttpClient({ url: IPFS_URL });
-    const ceramic = await Ceramic.create(ipfs);
+    const ceramic = await Ceramic.create(ipfs, {
+      stateStorePath: "./ceramic.lvl",
+    });
 
     const idWallet = new IdentityWallet(
-      (ceramicReq) => getConsent(ceramicReq, expressReq),
+      (ceramicReq) => getConsent(ceramicReq, expressReq, email, db),
       {
         seed,
       }
     );
 
     try {
-      // this call triggers the `getConsent` function
+      // this call triggers the `getConsent` function,
+      // but it is acting syncronously?
+      // https://github.com/ceramicnetwork/js-ceramic/issues/191
       await ceramic.setDIDProvider(idWallet.get3idProvider());
-      res.send(did.id).status(201);
+      res.send(id).status(201);
+      // db.close(); <-- comment in when the above issue is fixed
     } catch (err) {
       res.send(err.message).status(err.code);
+      db.close();
     }
   });
+});
+
+/**
+ * This is insecure and needs to be fleshed out,
+ * but the idea is that the user would have received an email link
+ * clicking that link would take the user to a webpage with a
+ * one time use code in the URL bar (oauth)
+ *
+ * We go ahead and take the code, and flip the `auth` to true in the user
+ * which the getConsent function hears, and then confirms as consent
+ */
+router.post("/consent", async (req, res) => {
+  // code isnt used yet
+  const { email, code } = req.body;
+  const db = level("streams-did-mappings");
+  try {
+    const user = JSON.parse(await db.get(`email:${email}`));
+    await db.put(`email:${email}`, JSON.stringify({ ...user, auth: true }));
+    res.send().status(201);
+  } catch (err) {
+    res.send(err.message).status(err.code);
+  }
+
+  db.close();
 });
 
 // helper method for dev
