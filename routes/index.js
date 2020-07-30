@@ -81,6 +81,9 @@ router.post("/create-user", async (expressReq, res) => {
   });
 });
 
+// polls DB until the `auth` property returns true
+// which means the user successfully gave permission via email
+// and the /consent route was called
 const userConfirmation = async (email, db) => {
   let totalTime = 0;
   const pollForAuth = () =>
