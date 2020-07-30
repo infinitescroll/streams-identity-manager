@@ -102,10 +102,13 @@ const userConfirmation = async (email, db) => {
 const getConsent = async (ceramicReq, expressReq, email, db) => {
   // im not sure why this would ever happen on the create-user request
   if (req.headers.authorization) {
-    // validate vals against db vals
-    const vals = verifyJWT(req.headers.authorization.split(" ")[1]);
-    // validate vals against email and db vals here
-    return true;
+    // this isn't tested yet, just pseudo code
+    const { id } = await verifyJWT(
+      expressReq.headers.authorization.split(" ")[1]
+    );
+    const v = JSON.parse(await db.get(`email:${email}`));
+    // make sure what we have matches what the JWT claims to have
+    return id === v.id;
   } else {
     try {
       const userConfirmed = await userConfirmation(email, db);
