@@ -7,6 +7,8 @@ const IpfsHttpClient = require("ipfs-http-client");
 const crypto = require("crypto");
 const level = require("level");
 
+const { fetchUserFromJWT } = require("../middleware");
+
 const { createJWT } = require("../utils/jwt-helpers");
 
 const IPFS_URL = process.env.IPFS_URL || "http://127.0.0.1:5001";
@@ -18,7 +20,7 @@ router.get("/", (_, res) => {
   res.send("OWL");
 });
 
-const getNewSeed = () => `0x${crypto.randomBytes(32).toString("hex")}`;
+const getSeed = () => `0x${crypto.randomBytes(32).toString("hex")}`;
 
 const validateEmail = (email) => {
   const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -27,59 +29,84 @@ const validateEmail = (email) => {
 
 const sendEmail = () => new Promise((resolve) => setTimeout(resolve, 1000));
 
+const createDID = async (ceramicInstance) => {
+  // UNSAFE?
+  return ceramicInstance.context.user._did;
+};
+
+const createUserEntryInDB = async (email, db) => {
+  // before we have a DID to PUT to the DB, we need to auth first, so id is left empty in the meantime
+  const objToStore = { id: "", auth: false };
+  return db.put(`email:${email}`, JSON.stringify(objToStore));
+};
+
+const updateUserEntryInDBWithDID = async (did, email, db) => {
+  const v = JSON.parse(await db.get(`email:${email}`));
+  return db.put(`email:${email}`, JSON.stringify({ ...v, id: did }));
+};
+
 // this is pretty tightly coupled with email auth for now...
-router.post("/create-user", async (expressReq, res) => {
-  const { email } = expressReq.body;
-  if (!validateEmail(email)) res.send("Error").status(404);
-  const db = level("streams-did-mappings");
-  db.get(`email:${email}`, async (err, value) => {
-    // some issue with level-db
-    if (err && !(err instanceof level.errors.NotFoundError)) {
-      await db.close();
-      return res.send(err.message).status(err.status);
-    }
+// creates a new DID
+// gets permission from the user via email to sign on behalf of this DID
+router.post(
+  "/create-did-with-consent",
+  fetchUserFromJWT,
+  async (expressReq, res) => {
+    const { email } = expressReq.body;
+    if (!validateEmail(email)) res.send("Error").status(404);
+    const db = level("streams-did-mappings");
 
-    // user DNE
-    if (err && err instanceof level.errors.NotFoundError) {
-      const ipfs = IpfsHttpClient({ url: IPFS_URL });
-      const ceramic = await Ceramic.create(ipfs, {
-        stateStorePath: "./ceramic.lvl",
-      });
-
-      // this is the seed we will use to generate identity wallet
-      const seed = getNewSeed();
-      const keyring = new Keyring(seed);
-      const { address } = keyring.managementWallet();
-      // this doc needs to be filled in properly
-      // waiting on OED's IDX package spec
-      const did = await ceramic.createDocument("3id", {
-        content: {
-          // pointer to the root index dociD
-          idx: "ceramic://rootindex",
-          // anything else?
-        },
-        owners: [address],
-      });
-
-      try {
-        // create a mapping to this DID from the email address
-        await db.put(
-          `email:${email}`,
-          JSON.stringify({ id: did.id, seed, auth: false })
-        );
-      } catch (err) {
+    db.get(`email:${email}`, async (err, value) => {
+      // some issue with level-db
+      if (err && !(err instanceof level.errors.NotFoundError)) {
         await db.close();
         return res.send(err.message).status(err.status);
       }
 
-      await db.close();
-      return res.send(did.id).status(201);
-    } else {
-      await db.close();
-      return res.send(JSON.parse(value).id).status(201);
-    }
-  });
-});
+      const userNotFound = err && err instanceof level.errors.NotFoundError;
+      const userConfirmed = value && !!JSON.parse(value).id;
+
+      if (userNotFound || !userConfirmed) {
+        const ipfs = IpfsHttpClient({ url: IPFS_URL });
+        const ceramic = await Ceramic.create(ipfs, {
+          // this might cause issues
+          // we may need to create a separate stateStorePath for each user
+          stateStorePath: "./ceramic.lvl",
+        });
+
+        const seed = getSeed(email);
+        const idWallet = new IdentityWallet(
+          (ceramicReq) => getConsent(ceramicReq, expressReq, email, db),
+          {
+            seed,
+          }
+        );
+
+        try {
+          await createUserEntryInDB(email, db);
+          // this call triggers the `getConsent` function, but it's brokey
+          // https://github.com/ceramicnetwork/js-ceramic/issues/191
+          await ceramic.setDIDProvider(idWallet.get3idProvider());
+          // this `createDID` func will done automatically by Identity Wallet in the background
+          // so we should be able to delete this function call in future identity wallet versions
+          const did = await createDID(ceramic);
+          await updateUserEntryInDBWithDID(did, email, db);
+
+          const jwt = await createJWT({ email, id: did });
+          res.send(jwt).status(201);
+          // db.close(); <-- comment in when the above issue is fixed
+        } catch (err) {
+          res.send(err.message).status(err.code);
+          db.close();
+        }
+      } else {
+        await db.close();
+        const jwt = await createJWT({ email, id: JSON.parse(value).id });
+        return res.send(jwt).status(201);
+      }
+    });
+  }
+);
 
 // polls DB until the `auth` property returns true
 // which means the user successfully gave permission via email
@@ -103,15 +130,8 @@ const userConfirmation = async (email, db) => {
 };
 
 const getConsent = async (ceramicReq, expressReq, email, db) => {
-  // im not sure why this would ever happen on the create-user request
-  if (req.headers.authorization) {
-    // this isn't tested yet, just pseudo code
-    const { id } = await verifyJWT(
-      expressReq.headers.authorization.split(" ")[1]
-    );
-    const v = JSON.parse(await db.get(`email:${email}`));
-    // make sure what we have matches what the JWT claims to have
-    return id === v.id;
+  if (expressReq.user) {
+    return true;
   } else {
     try {
       const userConfirmed = await userConfirmation(email, db);
@@ -122,54 +142,6 @@ const getConsent = async (ceramicReq, expressReq, email, db) => {
     }
   }
 };
-
-// The AUTH handlers here should **ALWAYS** return a JWT,
-// regardless of the underlying strategy
-router.post("/get-permission-via-email", async (expressReq, res) => {
-  const { email } = expressReq.body;
-  if (!validateEmail(email)) res.send("Error: invalid email").status(404);
-  sendEmail(email);
-  const db = level("streams-did-mappings");
-  db.get(`email:${email}`, async (err, v) => {
-    const { id, seed } = JSON.parse(v);
-    // some issue with level-db
-    if (err) {
-      db.close();
-      return res.send(err.message).status(err.status);
-    }
-
-    // user already exists, just send back their DID
-    if (!id) {
-      db.close();
-      return res.send(`User with email ${email} not found`).status(404);
-    }
-
-    const ipfs = IpfsHttpClient({ url: IPFS_URL });
-    const ceramic = await Ceramic.create(ipfs, {
-      stateStorePath: "./ceramic.lvl",
-    });
-
-    const idWallet = new IdentityWallet(
-      (ceramicReq) => getConsent(ceramicReq, expressReq, email, db),
-      {
-        seed,
-      }
-    );
-
-    try {
-      // this call triggers the `getConsent` function,
-      // but it is acting syncronously?
-      // https://github.com/ceramicnetwork/js-ceramic/issues/191
-      await ceramic.setDIDProvider(idWallet.get3idProvider());
-      const jwt = await createJWT({ email, id });
-      res.send(jwt).status(201);
-      // db.close(); <-- comment in when the above issue is fixed
-    } catch (err) {
-      res.send(err.message).status(err.code);
-      db.close();
-    }
-  });
-});
 
 /**
  * This is insecure and needs to be fleshed out,
@@ -187,7 +159,7 @@ router.post("/consent", async (req, res) => {
   try {
     const user = JSON.parse(await db.get(`email:${email}`));
     await db.put(`email:${email}`, JSON.stringify({ ...user, auth: true }));
-    res.send().status(201);
+    res.send().status(203);
   } catch (err) {
     res.send(err.message).status(err.code);
   }
@@ -197,5 +169,9 @@ router.post("/consent", async (req, res) => {
 
 // helper method for dev
 router.delete("/user", async (req, res) => {});
+
+router.get("/user/me", fetchUserFromJWT, async (req, res) => {
+  return res.json(req.user);
+});
 
 module.exports = router;
