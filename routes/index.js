@@ -14,12 +14,19 @@ const IPFS_URL = process.env.IPFS_URL || "http://127.0.0.1:5001";
 const DB_POLL_INTERVAL = process.env.DB_POLL_INTERVAL || 1000;
 const EMAIL_CONFIRMATION_MAX_WAIT =
   process.env.EMAIL_CONFIRMATION_MAX_WAIT || 10000;
+const SUPER_SECRET_SECRET = process.env.SUPER_SECRET_SECRET || "xxxyyyzzz";
 
 router.get("/", (_, res) => {
   res.send("OWL");
 });
 
-const getSeed = () => `0x${crypto.randomBytes(32).toString("hex")}`;
+const getSeed = (email) => {
+  const valsToHash = [SUPER_SECRET_SECRET, email];
+  const hash = crypto.createHash("sha256");
+  valsToHash.forEach((val) => hash.update(val, "utf8"));
+
+  return `0x${hash.digest("hex")}`;
+};
 
 const validateEmail = (email) => {
   const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -51,8 +58,8 @@ router.post(
   "/create-did-with-consent",
   fetchUserFromJWT,
   async (expressReq, res) => {
-    if (req.user) {
-      const jwt = await createJWT(req.user);
+    if (expressReq.user) {
+      const jwt = await createJWT(expressReq.user);
       return res.send(jwt).status(201);
     }
 
@@ -87,7 +94,7 @@ router.post(
 
       const jwt = await createJWT({ email, id: did });
       res.send(jwt).status(201);
-      db.close(); // this cuases some funny race conditions because of the linked ceramic issue above
+      db.close(); // this can cause some funny race conditions because of the linked ceramic issue above
     } catch (err) {
       res.send(err.message).status(err.code);
       db.close();
