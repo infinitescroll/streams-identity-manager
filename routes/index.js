@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const Ceramic = require("@ceramicnetwork/ceramic-core").default;
 const IdentityWallet = require("identity-wallet");
-const Keyring = require("identity-wallet/lib/keyring");
 const IpfsHttpClient = require("ipfs-http-client");
 const crypto = require("crypto");
 const level = require("level");
@@ -52,59 +51,47 @@ router.post(
   "/create-did-with-consent",
   fetchUserFromJWT,
   async (expressReq, res) => {
+    if (req.user) {
+      const jwt = await createJWT(req.user);
+      return res.send(jwt).status(201);
+    }
+
     const { email } = expressReq.body;
-    if (!validateEmail(email)) res.send("Error").status(404);
+    if (!validateEmail(email)) return res.send("Invalid email").status(404);
+
     const db = level("streams-did-mappings");
-
-    db.get(`email:${email}`, async (err, value) => {
-      // some issue with level-db
-      if (err && !(err instanceof level.errors.NotFoundError)) {
-        await db.close();
-        return res.send(err.message).status(err.status);
-      }
-
-      const userNotFound = err && err instanceof level.errors.NotFoundError;
-      const userConfirmed = value && !!JSON.parse(value).id;
-
-      if (userNotFound || !userConfirmed) {
-        const ipfs = IpfsHttpClient({ url: IPFS_URL });
-        const ceramic = await Ceramic.create(ipfs, {
-          // this might cause issues
-          // we may need to create a separate stateStorePath for each user
-          stateStorePath: "./ceramic.lvl",
-        });
-
-        const seed = getSeed(email);
-        const idWallet = new IdentityWallet(
-          (ceramicReq) => getConsent(ceramicReq, expressReq, email, db),
-          {
-            seed,
-          }
-        );
-
-        try {
-          await createUserEntryInDB(email, db);
-          // this call triggers the `getConsent` function, but it's brokey
-          // https://github.com/ceramicnetwork/js-ceramic/issues/191
-          await ceramic.setDIDProvider(idWallet.get3idProvider());
-          // this `createDID` func will done automatically by Identity Wallet in the background
-          // so we should be able to delete this function call in future identity wallet versions
-          const did = await createDID(ceramic);
-          await updateUserEntryInDBWithDID(did, email, db);
-
-          const jwt = await createJWT({ email, id: did });
-          res.send(jwt).status(201);
-          // db.close(); <-- comment in when the above issue is fixed
-        } catch (err) {
-          res.send(err.message).status(err.code);
-          db.close();
-        }
-      } else {
-        await db.close();
-        const jwt = await createJWT({ email, id: JSON.parse(value).id });
-        return res.send(jwt).status(201);
-      }
+    const ipfs = IpfsHttpClient({ url: IPFS_URL });
+    const ceramic = await Ceramic.create(ipfs, {
+      // this might cause issues
+      // we may need to create a separate stateStorePath for each user
+      stateStorePath: "./ceramic.lvl",
     });
+
+    const seed = getSeed(email);
+    const idWallet = new IdentityWallet(
+      (ceramicReq) => getConsent(ceramicReq, expressReq, email, db),
+      {
+        seed,
+      }
+    );
+
+    try {
+      await createUserEntryInDB(email, db);
+      // this call triggers the `getConsent` function, but it's brokey
+      // https://github.com/ceramicnetwork/js-ceramic/issues/191
+      await ceramic.setDIDProvider(idWallet.get3idProvider());
+      // this `createDID` func will done automatically by Identity Wallet in the background
+      // so we should be able to delete this function call in future identity wallet versions
+      const did = await createDID(ceramic);
+      await updateUserEntryInDBWithDID(did, email, db);
+
+      const jwt = await createJWT({ email, id: did });
+      res.send(jwt).status(201);
+      db.close(); // this cuases some funny race conditions because of the linked ceramic issue above
+    } catch (err) {
+      res.send(err.message).status(err.code);
+      db.close();
+    }
   }
 );
 

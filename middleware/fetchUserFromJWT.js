@@ -10,7 +10,6 @@ const fetchUserFromJWT = async (req, res, next) => {
       const jwt = req.headers.authorization.split(" ")[1];
       const { email, id } = await verifyJWT(jwt);
       const v = JSON.parse(await db.get(`email:${email}`));
-      console.log(v);
       if (v.id === id) {
         req.user = { email, id };
         next();
