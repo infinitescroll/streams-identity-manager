@@ -7,7 +7,7 @@
     "start:dev": "nodemon ./bin/www"
   },
   "dependencies": {
-    "@ceramicnetwork/ceramic-core": "^0.2.4",
+    "@ceramicnetwork/ceramic-core": "^0.2.8",
     "crypto": "^1.0.1",
     "debug": "~2.6.9",
     "express": "~4.16.1",

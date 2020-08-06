@@ -87,6 +87,7 @@ router.post(
       // this call triggers the `getConsent` function, but it's brokey
       // https://github.com/ceramicnetwork/js-ceramic/issues/191
       await ceramic.setDIDProvider(idWallet.get3idProvider());
+      console.log("log B");
       // this `createDID` func will done automatically by Identity Wallet in the background
       // so we should be able to delete this function call in future identity wallet versions
       const did = await createDID(ceramic);
@@ -96,7 +97,7 @@ router.post(
       res.send(jwt).status(201);
       db.close(); // this can cause some funny race conditions because of the linked ceramic issue above
     } catch (err) {
-      res.send(err.message).status(err.code);
+      res.send(err.message).status(500);
       db.close();
     }
   }
@@ -124,17 +125,26 @@ const userConfirmation = async (email, db) => {
 };
 
 const getConsent = async (ceramicReq, expressReq, email, db) => {
-  if (expressReq.user) {
-    return true;
-  } else {
-    try {
-      const userConfirmed = await userConfirmation(email, db);
-      return userConfirmed;
-    } catch (err) {
-      // no consent if error happened?
-      return false;
-    }
-  }
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      console.log("Log A");
+      return resolve(true);
+    }, 2000);
+  });
+  // if (expressReq.user) {
+  //   console.log("made it here");
+  //   return true;
+  // } else {
+  //   try {
+  //     console.log("pre confirm");
+  //     const userConfirmed = await userConfirmation(email, db);
+  //     console.log("post confirm");
+  //     return userConfirmed;
+  //   } catch (err) {
+  //     // no consent if error happened?
+  //     return false;
+  //   }
+  // }
 };
 
 /**
