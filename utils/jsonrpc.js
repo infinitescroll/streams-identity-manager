@@ -1,5 +1,3 @@
-const handlers = require("../handlers");
-
 const rpcErrorMessages = {
   "-32700": "Parse error",
   "-32600": "Invalid Request",
@@ -38,6 +36,12 @@ class RPCError {
   };
 }
 
+class InvalidParamsError extends RPCError {
+  constructor() {
+    super({ code: -32602 });
+  }
+}
+
 class RPCResponse {
   constructor({ id, result, error }) {
     this.id = id;
@@ -61,31 +65,11 @@ const parseJsonrpcReq = (req) => {
   return { jsonrpc, method, Identity, Handler, params, id };
 };
 
-const bindHandler = (req, res, next) => {
-  const { Handler, params } = parseJsonrpcReq(req);
-  return handlers[Handler].bind(this, req, res, next, params);
-};
-
-const ensureValidJsonrpcRequest = (req, res, next) => {
-  const { id, Identity, Handler } = parseJsonrpcReq(req);
-  if (Identity !== "Identity" || !handlers[Handler]) {
-    const error = new RPCError({ code: -32601 });
-    const response = new RPCResponse({
-      id,
-      error: error.toJSON(),
-    });
-    res.json(response).status(400);
-    return;
-  }
-  next();
-};
-
 module.exports = {
-  bindHandler,
   isValidCode,
   getMessageFromCode,
   RPCError,
   RPCResponse,
   parseJsonrpcReq,
-  ensureValidJsonrpcRequest,
+  InvalidParamsError,
 };

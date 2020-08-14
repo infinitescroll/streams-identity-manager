@@ -1,7 +1,9 @@
 const createError = require("http-errors");
 const express = require("express");
 const logger = require("morgan");
-const { ensureValidJsonrpcRequest, bindHandler } = require("./utils/jsonrpc");
+const { parseJsonrpcReq } = require("./utils/jsonrpc");
+const handlers = require("./handlers");
+const { ensureValidJsonrpcRequest } = require("./middleware");
 
 const app = express();
 
@@ -10,8 +12,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.post("/rpc/v0", ensureValidJsonrpcRequest, async (req, res, next) => {
-  const handler = bindHandler(req, res, next);
-  await handler();
+  const { id, Handler, params } = parseJsonrpcReq(req);
+  return handlers[Handler](req, res, next, id, params);
 });
 
 // catch 404 and forward to error handler
