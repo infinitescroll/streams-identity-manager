@@ -5,7 +5,11 @@ const crypto = require("crypto");
 const level = require("level");
 
 const { createJWT } = require("../../utils/jwt-helpers");
-const { InvalidParamsError, RPCResponse } = require("../../utils/jsonrpc");
+const {
+  InvalidParamsError,
+  RPCResponse,
+  RPCError,
+} = require("../../utils/jsonrpc");
 const { getConsent } = require("./getConsent");
 const { createUserEntryInDB, updateUserEntryInDBWithDID } = require("./db");
 const sendEmail = require("./sendEmail");
@@ -67,10 +71,16 @@ module.exports = async (req, res, _, id, [email]) => {
     await updateUserEntryInDBWithDID(did, email, db);
 
     const jwt = await createJWT({ email, id: did });
-    res.send(jwt).status(201);
+
+    res.json(new RPCResponse({ id, result: { jwt, did } })).status(201);
     db.close();
+    return;
   } catch (err) {
-    res.send(err.message).status(500);
+    res
+      .json(new RPCResponse({ id, error: new RPCError({ error: -32001 }) }))
+      .status(201);
+
     db.close();
+    return;
   }
 };

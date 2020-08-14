@@ -1,10 +1,4 @@
-const rpcErrorMessages = {
-  "-32700": "Parse error",
-  "-32600": "Invalid Request",
-  "-32601": "Method not found",
-  "-32602": "Invalid params",
-  "-32603": "Internal error",
-};
+const RPCErrorMessages = require("../RPCErrorCodes.json");
 
 const reservedJsonrpcCodes = new Set([-32700, -32600, -32601, -32602, -32603]);
 
@@ -18,7 +12,7 @@ const getMessageFromCode = (code) => {
   if (!isValidCode(code)) return "Invalid code passed";
   const codeString = code.toString();
 
-  if (rpcErrorMessages[codeString]) return rpcErrorMessages[codeString];
+  if (RPCErrorMessages[codeString]) return RPCErrorMessages[codeString];
 };
 
 // https://www.jsonrpc.org/specification#error_object
