@@ -30,6 +30,18 @@ class RPCError {
   };
 }
 
+class InvalidOneTimePassError extends RPCError {
+  constructor() {
+    super({ code: -32002 });
+  }
+}
+
+class InternalError extends RPCError {
+  constructor() {
+    super({ code: -32603 });
+  }
+}
+
 class InvalidParamsError extends RPCError {
   constructor() {
     super({ code: -32602 });
@@ -66,4 +78,6 @@ module.exports = {
   RPCResponse,
   parseJsonrpcReq,
   InvalidParamsError,
+  InvalidOneTimePassError,
+  InternalError,
 };

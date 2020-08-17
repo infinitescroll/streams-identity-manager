@@ -2,7 +2,6 @@ const Ceramic = require("@ceramicnetwork/ceramic-core").default;
 const IdentityWallet = require("identity-wallet");
 const IpfsHttpClient = require("ipfs-http-client");
 const crypto = require("crypto");
-const level = require("level");
 
 const { createJWT } = require("../../utils/jwt-helpers");
 const {
@@ -12,7 +11,6 @@ const {
 } = require("../../utils/jsonrpc");
 const { getConsent } = require("./getConsent");
 const { createUserEntryInDB, updateUserEntryInDBWithDID } = require("./db");
-const sendEmail = require("./sendEmail");
 
 const { IPFS_URL, SUPER_SECRET_SECRET } = require("../../constants");
 
@@ -33,7 +31,7 @@ const createDID = async (ceramicInstance) => {
   return ceramicInstance.context.user._did;
 };
 
-module.exports = async (req, res, _, id, [email]) => {
+module.exports = async (req, res, _, db, id, [email]) => {
   if (!validateEmail(email)) {
     const error = new InvalidParamsError();
     const response = new RPCResponse({
@@ -41,10 +39,9 @@ module.exports = async (req, res, _, id, [email]) => {
       error,
     });
 
-    return res.json(response).status(400);
+    return res.status(400).json(response);
   }
 
-  const db = level("streams-did-mappings");
   const ipfs = IpfsHttpClient({ url: IPFS_URL });
   const ceramic = await Ceramic.create(ipfs, {
     // this might cause issues
@@ -62,7 +59,6 @@ module.exports = async (req, res, _, id, [email]) => {
 
   try {
     await createUserEntryInDB(email, db);
-    sendEmail(email);
     // this call triggers the `getConsent` function
     await ceramic.setDIDProvider(idWallet.get3idProvider());
     // this `createDID` func will done automatically by Identity Wallet in the background
@@ -72,15 +68,10 @@ module.exports = async (req, res, _, id, [email]) => {
 
     const jwt = await createJWT({ email, id: did });
 
-    res.json(new RPCResponse({ id, result: { jwt, did } })).status(201);
-    db.close();
-    return;
+    res.status(201).json(new RPCResponse({ id, result: { jwt, did } }));
   } catch (err) {
     res
-      .json(new RPCResponse({ id, error: new RPCError({ error: -32001 }) }))
-      .status(201);
-
-    db.close();
-    return;
+      .status(400)
+      .json(new RPCResponse({ id, error: new RPCError({ error: -32001 }) }));
   }
 };
