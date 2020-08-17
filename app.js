@@ -4,7 +4,7 @@ const logger = require("morgan");
 const level = require("level");
 const { parseJsonrpcReq } = require("./utils/jsonrpc");
 const handlers = require("./handlers");
-const { ensureValidJsonrpcRequest } = require("./middleware");
+const { ensureValidJsonrpcRequest, jsonrpcLogger } = require("./middleware");
 const { STREAMS_DID_EMAIL_DB } = require("./constants");
 
 const app = express();
@@ -17,6 +17,7 @@ app.set(STREAMS_DID_EMAIL_DB, db);
 app.use(logger("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(jsonrpcLogger);
 
 app.post("/rpc/v0", ensureValidJsonrpcRequest, async (req, res, next) => {
   const { id, Handler, params } = parseJsonrpcReq(req);

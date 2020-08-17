@@ -13,6 +13,7 @@ module.exports = async (_, res, __, db, id, [email, otp]) => {
     res
       .status(400)
       .json(new RPCResponse({ id, error: new InvalidOneTimePassError() }));
+    return;
   }
 
   if (validOTP) {
