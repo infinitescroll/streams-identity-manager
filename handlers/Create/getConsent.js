@@ -1,8 +1,10 @@
+const { authenticator } = require("otplib");
 const {
   DB_POLL_INTERVAL,
   EMAIL_CONFIRMATION_MAX_WAIT,
   SHOULD_SEND_EMAIL,
 } = require("../../constants");
+const sendEmail = require("./sendEmail");
 
 const NO_CONSENT_MSG = "User did not confirm email in time";
 
@@ -27,11 +29,33 @@ const userConfirmation = async (email, db) => {
   return pollForAuth();
 };
 
+const createOTP = async (email, db) => {
+  const secret = authenticator.generateSecret();
+  const otp = authenticator.generate(secret);
+
+  const objToStore = { secret, time: Date.now() };
+  await db.put(`OTP:email:${email}`, JSON.stringify(objToStore));
+
+  return otp;
+};
+
+const validateOTP = async (email, otp, db) => {
+  const v = await db.get(`OTP:email:${email}`);
+  if (v) {
+    const { secret, time } = JSON.parse(v);
+    // TODO: validate time...
+    return authenticator.check(otp, secret);
+  }
+  return false;
+};
+
 const getConsent = async (ceramicReq, expressReq, email, db) => {
   // if we're in dev mode, just give consent
   if (!SHOULD_SEND_EMAIL) {
     return true;
   } else {
+    const oneTimePass = await createOTP(email, db);
+    sendEmail(email, oneTimePass);
     try {
       const userConfirmed = await userConfirmation(email, db);
       return userConfirmed;
