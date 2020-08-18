@@ -1,6 +1,7 @@
 const { authenticator } = require("otplib");
 const level = require("level");
 const { OTP_DB } = require("../constants");
+const db = require("../handlers/Create/db");
 
 const createOTP = async (email) => {
   const secret = authenticator.generateSecret();
@@ -15,16 +16,20 @@ const createOTP = async (email) => {
 
 const validateOTP = async (email, otp) => {
   const db = level(OTP_DB);
-  const v = await db.get(`OTP:email:${email}`);
-  if (v) {
-    await db.del(`OTP:email:${email}`);
+  try {
+    const v = await db.get(`OTP:email:${email}`);
+    if (v) {
+      await db.del(`OTP:email:${email}`);
+      await db.close();
+      const { secret, time } = JSON.parse(v);
+      // TODO: validate time...
+      return authenticator.check(otp, secret);
+    }
     await db.close();
-    const { secret, time } = JSON.parse(v);
-    // TODO: validate time...
-    return authenticator.check(otp, secret);
+    return false;
+  } finally {
+    db.close();
   }
-  await db.close();
-  return false;
 };
 
 module.exports = {
