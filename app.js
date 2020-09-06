@@ -1,5 +1,6 @@
 const createError = require("http-errors");
 const express = require("express");
+const cors = require("cors");
 const logger = require("morgan");
 const level = require("level");
 const { parseJsonrpcReq } = require("./utils/jsonrpc");
@@ -15,6 +16,7 @@ const db = level(STREAMS_DID_EMAIL_DB);
 app.set(STREAMS_DID_EMAIL_DB, db);
 
 app.use(logger("dev"));
+app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(jsonrpcLogger);

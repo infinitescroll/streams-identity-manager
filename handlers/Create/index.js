@@ -1,18 +1,13 @@
-const Ceramic = require("@ceramicnetwork/ceramic-core").default;
-const IdentityWallet = require("identity-wallet");
-const IpfsHttpClient = require("ipfs-http-client");
+const CeramicClient = require("@ceramicnetwork/ceramic-http-client").default;
+const IdentityWallet = require("identity-wallet").default;
 const crypto = require("crypto");
 
 const { createJWT } = require("../../utils/jwt-helpers");
-const {
-  InvalidParamsError,
-  RPCResponse,
-  RPCError,
-} = require("../../utils/jsonrpc");
+const { InvalidParamsError, RPCResponse } = require("../../utils/jsonrpc");
 const { getConsent } = require("./getConsent");
 const { createUserEntryInDB, updateUserEntryInDBWithDID } = require("./db");
 
-const { IPFS_URL, SUPER_SECRET_SECRET } = require("../../constants");
+const { SUPER_SECRET_SECRET } = require("../../constants");
 
 const validateEmail = (email) => {
   const re = /^(([^<>()[\]\\.,;:\s@\"]+(\.[^<>()[\]\\.,;:\s@\"]+)*)|(\".+\"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
@@ -27,11 +22,26 @@ const getSeed = (email) => {
   return `0x${hash.digest("hex")}`;
 };
 
-const createDID = async (ceramicInstance) => {
-  return ceramicInstance.context.user._did;
+const asyncronouslyCreateUser = async (email, db) => {
+  // after sending back a JWT to the client, we go ahead and send a confirmation to the user to authenticate
+  const ceramic = new CeramicClient();
+  const seed = getSeed(email);
+  const idWallet = await IdentityWallet.create({
+    seed,
+    getPermission: () => getConsent(email, db),
+  });
+  // this call triggers the `getConsent` function
+  await ceramic.setDIDProvider(idWallet.getDidProvider());
+
+  const did = ceramic.context.did.id;
+  if (did) {
+    await updateUserEntryInDBWithDID(ceramic.context.did.id, email, db);
+  } else {
+    console.log("No DID found on ceramic client, did user confirm email?");
+  }
 };
 
-module.exports = async (req, res, _, db, id, [email]) => {
+module.exports = async (_, res, __, db, id, [email]) => {
   if (!validateEmail(email)) {
     const error = new InvalidParamsError();
     const response = new RPCResponse({
@@ -41,37 +51,9 @@ module.exports = async (req, res, _, db, id, [email]) => {
 
     return res.status(400).json(response);
   }
+  await createUserEntryInDB(email, db);
+  const partialJWT = await createJWT({ email });
+  res.status(201).json(new RPCResponse({ id, result: { jwt: partialJWT } }));
 
-  const ipfs = IpfsHttpClient({ url: IPFS_URL });
-  const ceramic = await Ceramic.create(ipfs, {
-    // this might cause issues
-    // we may need to create a separate stateStorePath for each user
-    stateStorePath: "./ceramic.lvl",
-  });
-
-  const seed = getSeed(email);
-  const idWallet = new IdentityWallet(
-    (ceramicReq) => getConsent(ceramicReq, req, email, db),
-    {
-      seed,
-    }
-  );
-
-  try {
-    await createUserEntryInDB(email, db);
-    // this call triggers the `getConsent` function
-    await ceramic.setDIDProvider(idWallet.get3idProvider());
-    // this `createDID` func will done automatically by Identity Wallet in the background
-    // so we should be able to delete this function call in future identity wallet versions
-    const did = await createDID(ceramic);
-    await updateUserEntryInDBWithDID(did, email, db);
-
-    const jwt = await createJWT({ email, id: did });
-
-    res.status(201).json(new RPCResponse({ id, result: { jwt, did } }));
-  } catch (err) {
-    res
-      .status(400)
-      .json(new RPCResponse({ id, error: new RPCError({ error: -32001 }) }));
-  }
+  await asyncronouslyCreateUser(email, db);
 };

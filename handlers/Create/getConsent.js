@@ -29,7 +29,7 @@ const userConfirmation = async (email, db) => {
   return pollForAuth();
 };
 
-const getConsent = async (ceramicReq, expressReq, email, db) => {
+const getConsent = async (email, db) => {
   // if we're in dev mode, just give consent
   if (!SHOULD_SEND_EMAIL) {
     return true;
