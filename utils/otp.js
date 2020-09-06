@@ -1,7 +1,6 @@
 const { authenticator } = require("otplib");
 const level = require("level");
 const { OTP_DB } = require("../constants");
-const db = require("../handlers/Create/db");
 
 const createOTP = async (email) => {
   const secret = authenticator.generateSecret();

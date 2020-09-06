@@ -2,6 +2,7 @@ const nodemailer = require("nodemailer");
 const { EMAIL_ADDRESS, EMAIL_PASS } = require("../../constants");
 
 module.exports = async (to, code) => {
+  console.log(code);
   // this is insecuure
   const transporter = nodemailer.createTransport({
     service: "Gmail",

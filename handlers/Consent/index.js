@@ -6,6 +6,7 @@ const {
 } = require("../../utils/jsonrpc");
 
 module.exports = async (_, res, __, db, id, [email, otp]) => {
+  const partialJWTClaimsThisEmail = req.user.email === email;
   let validOTP = false;
   try {
     validOTP = await validateOTP(email, otp);
@@ -16,7 +17,7 @@ module.exports = async (_, res, __, db, id, [email, otp]) => {
     return;
   }
 
-  if (validOTP) {
+  if (validOTP && partialJWTClaimsThisEmail) {
     try {
       const user = JSON.parse(await db.get(`email:${email}`));
       await db.put(`email:${email}`, JSON.stringify({ ...user, auth: true }));

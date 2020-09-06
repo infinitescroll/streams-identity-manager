@@ -5,7 +5,11 @@ const logger = require("morgan");
 const level = require("level");
 const { parseJsonrpcReq } = require("./utils/jsonrpc");
 const handlers = require("./handlers");
-const { ensureValidJsonrpcRequest, jsonrpcLogger } = require("./middleware");
+const {
+  ensureValidJsonrpcRequest,
+  jsonrpcLogger,
+  fetchUserFromJWT,
+} = require("./middleware");
 const { STREAMS_DID_EMAIL_DB } = require("./constants");
 
 const app = express();
@@ -21,11 +25,17 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(jsonrpcLogger);
 
-app.post("/rpc/v0", ensureValidJsonrpcRequest, async (req, res, next) => {
-  const { id, Handler, params } = parseJsonrpcReq(req);
-  const db = app.get(STREAMS_DID_EMAIL_DB);
-  return handlers[Handler](req, res, next, db, id, params);
-});
+app.post(
+  "/rpc/v0",
+  ensureValidJsonrpcRequest,
+  (req, res, next) =>
+    fetchUserFromJWT(req, res, next, app.get(STREAMS_DID_EMAIL_DB)),
+  async (req, res, next) => {
+    const { id, Handler, params } = parseJsonrpcReq(req);
+    const db = app.get(STREAMS_DID_EMAIL_DB);
+    return handlers[Handler](req, res, next, db, id, params);
+  }
+);
 
 // catch 404 and forward to error handler
 app.use(function (req, res, next) {
