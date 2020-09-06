@@ -4,7 +4,7 @@ const crypto = require("crypto");
 
 const { createJWT } = require("../../utils/jwt-helpers");
 const { InvalidParamsError, RPCResponse } = require("../../utils/jsonrpc");
-const { getConsent } = require("./getConsent");
+const { getPermission } = require("./getPermission");
 const { createUserEntryInDB, updateUserEntryInDBWithDID } = require("./db");
 
 const { SUPER_SECRET_SECRET } = require("../../constants");
@@ -28,9 +28,9 @@ const asyncronouslyCreateUser = async (email, db) => {
   const seed = getSeed(email);
   const idWallet = await IdentityWallet.create({
     seed,
-    getPermission: () => getConsent(email, db),
+    getPermission: () => getPermission(email, db),
   });
-  // this call triggers the `getConsent` function
+  // this call triggers the `getPermission` function
   await ceramic.setDIDProvider(idWallet.getDidProvider());
 
   const did = ceramic.context.did.id;
@@ -52,6 +52,7 @@ module.exports = async (_, res, __, db, id, [email]) => {
     return res.status(400).json(response);
   }
   await createUserEntryInDB(email, db);
+  // partial JWT doesnt include DID in its claims
   const partialJWT = await createJWT({ email });
   res.status(201).json(new RPCResponse({ id, result: { jwt: partialJWT } }));
 
