@@ -35,7 +35,7 @@ module.exports = async (req, res, __, db, id, [email, otp]) => {
       await did.authenticate();
       if (did.id) {
         await updateUserEntryInDBWithDID(did.id, email, db);
-        const jwt = createJWT({ email, did: did.id });
+        const jwt = await createJWT({ email, did: did.id });
         res
           .status(201)
           .json(new RPCResponse({ id, result: { jwt, did: did.id } }));
