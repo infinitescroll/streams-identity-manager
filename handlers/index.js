@@ -1,7 +1,7 @@
-const Create = require("./Create");
+const RequestPermission = require("./RequestPermission");
 const Consent = require("./Consent");
 
 module.exports = {
   Consent,
-  Create,
+  RequestPermission,
 };

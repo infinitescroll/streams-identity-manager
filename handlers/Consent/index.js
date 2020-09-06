@@ -7,7 +7,7 @@ const {
   InvalidOneTimePassError,
   RPCResponse,
 } = require("../../utils/jsonrpc");
-const { updateUserEntryInDBWithDID } = require("../Create/db");
+const { updateUserEntryInDBWithDID } = require("../../db");
 const { createJWT } = require("../../utils/jwt-helpers");
 
 module.exports = async (req, res, __, db, id, [email, otp]) => {
@@ -39,6 +39,7 @@ module.exports = async (req, res, __, db, id, [email, otp]) => {
         res
           .status(201)
           .json(new RPCResponse({ id, result: { jwt, did: did.id } }));
+        configureUserDIDWPermissions();
       } else {
         res
           .status(500)
