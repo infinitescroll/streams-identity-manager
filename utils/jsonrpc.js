@@ -51,15 +51,13 @@ class InvalidParamsError extends RPCError {
 class RPCResponse {
   constructor({ id, result, error }) {
     this.id = id;
-    this.result = result;
+    this.result = result !== undefined ? result : "";
     this.error = error;
   }
 
   toJSON = () => {
-    const resp = { jsonrpc: "2.0" };
-
+    const resp = { jsonrpc: "2.0", result: this.result };
     if (!!this.id) resp.id = this.id;
-    if (!!this.result) resp.result = this.result;
     if (!!this.error) resp.error = this.error;
     return resp;
   };
