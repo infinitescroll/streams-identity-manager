@@ -1,5 +1,3 @@
-const level = require("level");
-
 const { verifyJWT } = require("../utils/jwt-helpers");
 
 const fetchUserFromJWT = async (req, res, next, db) => {
@@ -7,15 +5,15 @@ const fetchUserFromJWT = async (req, res, next, db) => {
   if (req.headers.authorization) {
     try {
       const jwt = req.headers.authorization.split(" ")[1];
-      const { email, id } = await verifyJWT(jwt);
+      const { email, did } = await verifyJWT(jwt);
       const v = JSON.parse(await db.get(`email:${email}`));
-      if (v.id === id) {
+      if (v.did === did) {
         // full jwt
-        req.user = { email, id };
+        req.user = { email, did };
         next();
-      } else if (!v.id) {
+      } else if (!v.did) {
         // partial jwt
-        req.user = { email, id: null };
+        req.user = { email, did: null };
         next();
       } else {
         next(new Error("Invalid JWT"));
