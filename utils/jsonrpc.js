@@ -65,8 +65,8 @@ class RPCResponse {
 
 const parseJsonrpcReq = (req) => {
   const { jsonrpc, method, params, id } = req.body;
-  const [Identity, Handler] = method.split(".");
-  return { jsonrpc, method, Identity, Handler, params, id };
+  const [Namespace, Handler] = method.split(".");
+  return { jsonrpc, method, Namespace, Handler, params, id };
 };
 
 module.exports = {

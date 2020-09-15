@@ -1,7 +1,7 @@
 const { IDX } = require("@ceramicstudio/idx");
-const { fullSchemaList } = require("../../schemas");
-const definitions = require("../../definitions");
 const chalk = require("chalk");
+const { fullSchemaList } = require("../../../schemas");
+const definitions = require("../../../definitions");
 const log = console.log;
 
 /**
@@ -29,18 +29,17 @@ const configureUserDIDWPermissions = async (ceramic) => {
   try {
     // getIDXContent will create a root IDX doc if one isn't already created
     await user.getIDXContent();
-    await listDatabases(user);
     if (await isEmptyUser(user)) {
       await createUser(user);
     }
   } catch (error) {
     // TODO: send email here notifying error maybe bc we're doing this in the background?
-    log(chalk.red("ERROR: ", error));
+    log(chalk.red("ERROR: ", error.stack));
   }
 };
 
 const isEmptyUser = async (user) => {
-  const content = await user.get(definitions.databases, user.id);
+  const content = await user.get("databases", user.id);
   return !!content.databases;
 };
 
@@ -59,7 +58,7 @@ const createUser = async (user) => {
 };
 
 const listDatabases = async (user) => {
-  const databases = await user.get(definitions.datatbases, user.id);
+  const databases = await user.get("databases", user.id);
   return databases;
 };
 

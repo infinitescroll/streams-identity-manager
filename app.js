@@ -31,9 +31,9 @@ app.post(
   (req, res, next) =>
     fetchUserFromJWT(req, res, next, app.get(STREAMS_DID_EMAIL_DB)),
   async (req, res, next) => {
-    const { id, Handler, params } = parseJsonrpcReq(req);
+    const { id, Namespace, Handler, params } = parseJsonrpcReq(req);
     const db = app.get(STREAMS_DID_EMAIL_DB);
-    return handlers[Handler](req, res, next, db, id, params);
+    return handlers[Namespace][Handler](req, res, next, db, id, params);
   }
 );
 

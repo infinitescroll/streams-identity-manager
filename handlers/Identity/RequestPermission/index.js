@@ -1,9 +1,9 @@
-const { createJWT } = require("../../utils/jwt-helpers");
-const validateEmail = require("../../utils/validateEmail");
-const { createOTP } = require("../../utils/otp");
+const { createJWT } = require("../../../utils/jwt-helpers");
+const validateEmail = require("../../../utils/validateEmail");
+const { createOTP } = require("../../../utils/otp");
 const sendEmail = require("./sendEmail");
-const { InvalidParamsError, RPCResponse } = require("../../utils/jsonrpc");
-const { createUserEntryInDB } = require("../../db");
+const { InvalidParamsError, RPCResponse } = require("../../../utils/jsonrpc");
+const { createUserEntryInDB } = require("../../../db");
 
 module.exports = async (_, res, __, db, id, [email]) => {
   if (!validateEmail(email)) {

@@ -1,9 +1,7 @@
-const RequestPermission = require("./RequestPermission");
-const Consent = require("./Consent");
-const IsAuthenticated = require("./IsAuthenticated");
+const Identity = require("./Identity");
+const Database = require("./Database");
 
 module.exports = {
-  Consent,
-  IsAuthenticated,
-  RequestPermission,
+  Database,
+  Identity,
 };

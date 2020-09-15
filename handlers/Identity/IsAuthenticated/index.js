@@ -1,4 +1,4 @@
-const { RPCResponse } = require("../../utils/jsonrpc");
+const { RPCResponse } = require("../../../utils/jsonrpc");
 
 module.exports = async (req, res, __, db, id, [did]) => {
   const jwtClaimsThisDID = req?.user?.did === did;
