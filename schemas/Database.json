@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Database",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "title": "name",
+      "maxLength": 150
+    },
+    "image": {
+      "type": "string",
+      "title": "image",
+      "maxLength": 150
+    },
+    "description": {
+      "type": "string",
+      "title": "description",
+      "maxLength": 420
+    },
+    "emoji": {
+      "type": "string",
+      "title": "emoji",
+      "maxLength": 2
+    },
+    "url": {
+      "type": "string",
+      "title": "url",
+      "maxLength": 240
+    },
+    "threadID": {
+      "type": "string",
+      "title": "threadID"
+    },
+    "accessController": {
+      "type": "string",
+      "title": "accessController"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DatabaseAccessController",
+  "type": "object",
+  "properties": {
+    "encryptedServiceKey": {
+      "type": "string",
+      "title": "encryptedServiceKey"
+    },
+    "encryptedReadKey": {
+      "type": "string",
+      "title": "encryptedReadKey"
+    }
+  }
+}

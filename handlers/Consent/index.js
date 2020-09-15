@@ -1,7 +1,7 @@
 const CeramicClient = require("@ceramicnetwork/ceramic-http-client").default;
 const IdentityWallet = require("identity-wallet").default;
 const { validateOTP } = require("../../utils/otp");
-const getSeedFromEmail = require("../../utils/getSeedFromEmail");
+const getAuthSecret = require("../../utils/getAuthSecret");
 const {
   InternalError,
   InvalidOneTimePassError,
@@ -25,14 +25,16 @@ module.exports = async (req, res, __, db, id, [email, otp]) => {
 
   if (validOTP && partialJWTClaimsThisEmail) {
     try {
-      const seed = getSeedFromEmail(email);
-      const idWallet = await IdentityWallet.create({
-        seed,
-        getPermission: async () => true,
-      });
+      const authSecret = getAuthSecret(email);
       const ceramic = new CeramicClient();
-      await ceramic.setDIDProvider(idWallet.getDidProvider());
-      const did = ceramic.context.did.id;
+      const idWallet = await IdentityWallet.create({
+        authId: email,
+        authSecret,
+        getPermission: () => Promise.resolve([]),
+        ceramic,
+      });
+      ceramic.setDIDProvider(idWallet.getDidProvider());
+      const did = idWallet.DID;
       await updateUserEntryInDBWithDID(did, email, db);
       const jwt = await createJWT({ email, did });
       res.status(201).json(new RPCResponse({ id, result: { jwt, did } }));

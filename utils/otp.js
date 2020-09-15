@@ -26,6 +26,8 @@ const validateOTP = async (email, otp) => {
     }
     await db.close();
     return false;
+  } catch (err) {
+    console.log("Error validating OTP: ", err);
   } finally {
     db.close();
   }
