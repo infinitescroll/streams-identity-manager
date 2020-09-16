@@ -1,24 +1,24 @@
-const Database = require("./Database.json");
-const DatabaseAccessController = require("./DatabaseAccessController.json");
-const Databases = require("./Databases.json");
-const Service = require("./Service.json");
-const Services = require("./Services.json");
 const { schemasList } = require("@ceramicstudio/idx-schemas");
+const Database = require("./Database.json");
+const ThreadSecrets = require("./ThreadSecrets.json");
+const Databases = require("./Databases.json");
+const Permissions = require("./Permissions.json");
+const Permission = require("./Permission.json");
 
 const fullSchemaList = [
   ...schemasList,
   { name: "Databases", schema: Databases },
   { name: "Database", schema: Database },
-  { name: "DatabaseAccessController", schema: DatabaseAccessController },
-  { name: "Service", schema: Service },
-  { name: "Services", schema: Services },
+  { name: "ThreadSecrets", schema: ThreadSecrets },
+  { name: "Permissions", schema: Permissions },
+  { name: "Permission", schema: Permission },
 ];
 
 module.exports = {
   fullSchemaList,
   Databases,
   Database,
-  DatabaseAccessController,
-  Service,
-  Services,
+  ThreadSecrets,
+  Permissions,
+  Permission,
 };

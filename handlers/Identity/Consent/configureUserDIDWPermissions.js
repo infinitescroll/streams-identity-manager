@@ -1,7 +1,7 @@
 const { IDX } = require("@ceramicstudio/idx");
 const chalk = require("chalk");
-const { fullSchemaList } = require("../../../schemas");
-const definitions = require("../../../definitions");
+const schemas = require("../../../publishedSchemas.json");
+const definitions = require("../../../definitions.json");
 const log = console.log;
 
 /**
@@ -13,24 +13,22 @@ const log = console.log;
  *        'ceramic://bagcqceraynhpmkz6vtermrsyvbqx2sow2sv3lfkj4smhg3e3dafdsaiozak',
  *        etc...
  *    ]
- *
- *  // services are things that can make root level changes to your DID
- * // usually this will just be the identity/consent manager...
- *  services: [
+ *  permissions: [
  *        'ceramic://bagcqceraynhpmkz6vtermrsyvbqx2sow2sv3fdsasmhg3e32fdsa4nfdas',
  *    ]
  * }
  *
  */
 
-const configureUserDIDWPermissions = async (ceramic) => {
-  const user = new IDX({ ceramic, definitions, schemas: fullSchemaList });
+const configureUserDIDWPermissions = async (ceramic, appID) => {
+  const user = new IDX({ ceramic, definitions, schemas });
 
   try {
     // getIDXContent will create a root IDX doc if one isn't already created
     await user.getIDXContent();
-    if (await isEmptyUser(user)) {
-      await createUser(user);
+    const needsConfig = await !userConfigured(user);
+    if (needsConfig) {
+      await configureUser(user, ceramic, appID);
     }
   } catch (error) {
     // TODO: send email here notifying error maybe bc we're doing this in the background?
@@ -38,19 +36,24 @@ const configureUserDIDWPermissions = async (ceramic) => {
   }
 };
 
-const isEmptyUser = async (user) => {
-  const content = await user.get("databases", user.id);
-  return !!content.databases;
+const userConfigured = async (user) => {
+  const dbs = await user.get("databases", user.id);
+  const perms = await user.get("permissions", user.id);
+  const hasDbs = !!dbs?.databases;
+  const hasPerms = !!perms?.permissions;
+  return hasDbs && hasPerms;
 };
 
-const createUser = async (user) => {
+const configureUser = async (user, ceramic, appID) => {
   try {
-    await user.set("databases", { databases: [] });
-    await user.set("services", {
-      services: [
-        "ceramic://bagcqcera7ttwdxykuk2znrnv6yg44my6kdsz6hfpubicitcthi2kjbgyzh2q",
-      ],
+    const doc = await ceramic.createDocument("tile", {
+      content: {
+        did: appID,
+        scopes: [],
+      },
     });
+    await user.set("databases", { databases: [] });
+    await user.set("permissions", { permissions: [doc.id] });
   } catch (err) {
     // TODO: send email here notifying error maybe?
     log(chalk.red("ERROR: ", err));

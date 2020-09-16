@@ -12,12 +12,10 @@ const { createJWT } = require("../../../utils/jwt-helpers");
 const configureUserDIDWPermissions = require("./configureUserDIDWPermissions");
 
 module.exports = async (req, res, __, db, id, [email, otp]) => {
-  // const partialJWTClaimsThisEmail = req.user.email === email;
-  const partialJWTClaimsThisEmail = true;
-
-  let validOTP = true;
+  const partialJWTClaimsThisEmail = req.user.email === email;
+  let validOTP = false;
   try {
-    // validOTP = await validateOTP(email, otp);
+    validOTP = await validateOTP(email, otp);
   } catch (err) {
     res
       .status(400)
@@ -37,8 +35,12 @@ module.exports = async (req, res, __, db, id, [email, otp]) => {
       });
       ceramic.setDIDProvider(idWallet.getDidProvider());
       const did = idWallet.DID;
-      // await updateUserEntryInDBWithDID(did, email, db);
-      const jwt = await createJWT({ email, did });
+      await updateUserEntryInDBWithDID(did, email, db);
+      const jwt = await createJWT({
+        email,
+        did,
+        appID: "did:3:12345",
+      });
       res.status(201).json(new RPCResponse({ id, result: { jwt, did } }));
       configureUserDIDWPermissions(ceramic);
     } catch (err) {

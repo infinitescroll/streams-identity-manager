@@ -16,11 +16,17 @@ const seedDefinitions = () =>
     });
     const ceramic = new Ceramic();
     await ceramic.setDIDProvider(idWallet.getDidProvider());
+
     const schemas = await publishSchemas({
       ceramic,
       schemas: fullSchemaList,
     });
 
+    fs.writeFile(
+      `${__dirname}/../publishedSchemas.json`,
+      JSON.stringify(schemas),
+      reject
+    );
     const idx = new IDX({ ceramic, schemas });
 
     const definitions = {
@@ -36,14 +42,18 @@ const seedDefinitions = () =>
         name: "databases",
         schema: schemas.Databases,
       }),
-      services: await idx.createDefinition({
-        name: "services",
-        schema: schemas.Services,
+      permissions: await idx.createDefinition({
+        name: "permissions",
+        schema: schemas.Permissions,
+      }),
+      permission: await idx.createDefinition({
+        name: "permission",
+        schema: schemas.Permission,
       }),
     };
 
     fs.writeFile(
-      `${__dirname}/../definitions/index.json`,
+      `${__dirname}/../definitions.json`,
       JSON.stringify(definitions),
       reject
     );

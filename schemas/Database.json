@@ -32,9 +32,9 @@
       "type": "string",
       "title": "threadID"
     },
-    "accessController": {
+    "access": {
       "type": "string",
-      "title": "accessController"
+      "title": "access"
     }
   }
 }
