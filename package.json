@@ -6,10 +6,14 @@
     "start": "node ./bin/www",
     "start:dev": "nodemon ./bin/www",
     "start:ceramic": "ceramic daemon",
-    "write:definitions": "node scripts/seed-definitions.js"
+    "start:ipfs": "ipfs daemon --enable-pubsub-experiment",
+    "write:definitions": "node scripts/seed-definitions.js",
+    "bump:ceramic:deps": "npm i @ceramicnetwork/ceramic-http-client@latest @ceramicstudio/idx@latest @ceramicstudio/idx-schemas@latest && npm i -D @ceramicnetwork/ceramic-cli@latest"
   },
   "dependencies": {
-    "@ceramicnetwork/ceramic-http-client": "^0.5.12",
+    "@ceramicnetwork/ceramic-http-client": "^0.5.13",
+    "@ceramicstudio/idx": "^0.1.0",
+    "@ceramicstudio/idx-schemas": "^0.1.5",
     "chalk": "^4.1.0",
     "cors": "^2.8.5",
     "crypto": "^1.0.1",
@@ -26,7 +30,7 @@
     "otplib": "^12.0.1"
   },
   "devDependencies": {
-    "@ceramicnetwork/ceramic-cli": "^0.5.10",
+    "@ceramicnetwork/ceramic-cli": "^0.7.0",
     "nodemon": "^2.0.4"
   }
 }

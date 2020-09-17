@@ -4,3 +4,4 @@ streams-did-mappings/
 otp-db/
 definitions.json
 publishedSchemas.json
+.pinning.store

@@ -33,8 +33,8 @@ module.exports = async (req, res, __, db, id, [email, otp]) => {
         getPermission: () => Promise.resolve([]),
         ceramic,
       });
-      ceramic.setDIDProvider(idWallet.getDidProvider());
-      const did = idWallet.DID;
+      await ceramic.setDIDProvider(idWallet.getDidProvider());
+      const did = idWallet.id;
       await updateUserEntryInDBWithDID(did, email, db);
       const jwt = await createJWT({
         email,
