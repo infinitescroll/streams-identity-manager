@@ -3,12 +3,16 @@ const express = require("express");
 const cors = require("cors");
 const logger = require("morgan");
 const level = require("level");
-const { parseJsonrpcReq } = require("./utils/jsonrpc");
+const {
+  InternalError,
+  RPCResponse,
+  parseJsonrpcReq,
+} = require("./utils/jsonrpc");
 const handlers = require("./handlers");
 const {
   ensureValidJsonrpcRequest,
   jsonrpcLogger,
-  fetchUserFromJWT,
+  fetchInfoFromJWT,
 } = require("./middleware");
 const { STREAMS_DID_EMAIL_DB } = require("./constants");
 
@@ -29,7 +33,7 @@ app.post(
   "/rpc/v0",
   ensureValidJsonrpcRequest,
   (req, res, next) =>
-    fetchUserFromJWT(req, res, next, app.get(STREAMS_DID_EMAIL_DB)),
+    fetchInfoFromJWT(req, res, next, app.get(STREAMS_DID_EMAIL_DB)),
   async (req, res, next) => {
     const { id, Namespace, Handler, params } = parseJsonrpcReq(req);
     const db = app.get(STREAMS_DID_EMAIL_DB);
@@ -47,9 +51,9 @@ app.use(function (err, req, res, next) {
   // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get("env") === "development" ? err : {};
+  const { id } = parseJsonrpcReq(req);
 
-  // render the error page
-  res.send(err.message || "error").status(err.status || 500);
+  res.status(500).json(new RPCResponse({ id, error: new InternalError() }));
 });
 
 module.exports = app;

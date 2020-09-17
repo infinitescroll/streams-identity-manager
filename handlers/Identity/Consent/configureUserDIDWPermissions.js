@@ -26,7 +26,7 @@ const configureUserDIDWPermissions = async (ceramic, appID) => {
   try {
     // getIDXContent will create a root IDX doc if one isn't already created
     await user.getIDXContent();
-    const needsConfig = await !userConfigured(user);
+    const needsConfig = !(await userConfigured(user));
     if (needsConfig) {
       await configureUser(user, ceramic, appID);
     }

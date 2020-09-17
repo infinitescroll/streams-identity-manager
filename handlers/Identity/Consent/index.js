@@ -10,8 +10,11 @@ const {
 const { updateUserEntryInDBWithDID } = require("../../../db");
 const { createJWT } = require("../../../utils/jwt-helpers");
 const configureUserDIDWPermissions = require("./configureUserDIDWPermissions");
+const { instantiateCeramic } = require("../../../utils/ceramic");
 
-module.exports = async (req, res, __, db, id, [email, otp]) => {
+module.exports = async (req, res, next, db, id, [email, otp]) => {
+  // this is hardcoded for now, with 1 app
+  const appID = "did:3:12345";
   const partialJWTClaimsThisEmail = req.user.email === email;
   let validOTP = false;
   try {
@@ -25,27 +28,18 @@ module.exports = async (req, res, __, db, id, [email, otp]) => {
 
   if (validOTP && partialJWTClaimsThisEmail) {
     try {
-      const authSecret = getAuthSecret(email);
-      const ceramic = new CeramicClient();
-      const idWallet = await IdentityWallet.create({
-        authId: email,
-        authSecret,
-        getPermission: () => Promise.resolve([]),
-        ceramic,
-      });
-      await ceramic.setDIDProvider(idWallet.getDidProvider());
+      const { ceramic, idWallet } = await instantiateCeramic(email);
       const did = idWallet.id;
       await updateUserEntryInDBWithDID(did, email, db);
       const jwt = await createJWT({
         email,
         did,
-        appID: "did:3:12345",
+        appID,
       });
       res.status(201).json(new RPCResponse({ id, result: { jwt, did } }));
-      configureUserDIDWPermissions(ceramic);
+      configureUserDIDWPermissions(ceramic, appID);
     } catch (err) {
-      // TODO: pass error messages to client
-      res.status(500).json(new RPCResponse({ id, error: new InternalError() }));
+      next(err);
     }
   } else {
     res
