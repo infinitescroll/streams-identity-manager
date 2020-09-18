@@ -5,5 +5,7 @@
   "-32602": "Invalid params",
   "-32603": "Internal error",
   "-32001": "Error creating new DID",
-  "-32002": "Invalid one time password"
+  "-32002": "Invalid one time password",
+  "-32003": "Error creating new database",
+  "-32004": "App is unauthorized"
 }

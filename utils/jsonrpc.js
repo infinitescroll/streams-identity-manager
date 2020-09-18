@@ -3,7 +3,7 @@ const RPCErrorMessages = require("../RPCErrorCodes.json");
 const reservedJsonrpcCodes = new Set([-32700, -32600, -32601, -32602, -32603]);
 
 const isValidCode = (code) => {
-  if (reservedJsonrpcCodes.has(code) || (code >= -32000 && code <= -32099))
+  if (reservedJsonrpcCodes.has(code) || (code <= -32000 && code >= -32099))
     return true;
   return false;
 };
@@ -11,7 +11,6 @@ const isValidCode = (code) => {
 const getMessageFromCode = (code) => {
   if (!isValidCode(code)) return "Invalid code passed";
   const codeString = code.toString();
-
   if (RPCErrorMessages[codeString]) return RPCErrorMessages[codeString];
 };
 
