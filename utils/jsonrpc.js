@@ -30,20 +30,20 @@ class RPCError {
 }
 
 class InvalidOneTimePassError extends RPCError {
-  constructor() {
-    super({ code: -32002 });
+  constructor({ ...args } = {}) {
+    super({ code: -32002, ...args });
   }
 }
 
 class InternalError extends RPCError {
-  constructor() {
-    super({ code: -32603 });
+  constructor({ ...args } = {}) {
+    super({ code: -32603, ...args });
   }
 }
 
 class InvalidParamsError extends RPCError {
-  constructor() {
-    super({ code: -32602 });
+  constructor({ ...args } = {}) {
+    super({ code: -32602, ...args });
   }
 }
 

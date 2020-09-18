@@ -17,7 +17,6 @@ module.exports = async (
     await managedUser.createDB(name, threadID, readKey, serviceKey, req.appID);
     res.status(201).json(new RPCResponse({ id, result: "" }));
   } catch (err) {
-    console.log(err);
     res.status(201).json(
       new RPCResponse({
         id,

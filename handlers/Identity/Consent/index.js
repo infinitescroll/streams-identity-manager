@@ -1,9 +1,5 @@
-const CeramicClient = require("@ceramicnetwork/ceramic-http-client").default;
-const IdentityWallet = require("identity-wallet").default;
 const { validateOTP } = require("../../../utils/otp");
-const getAuthSecret = require("../../../utils/getAuthSecret");
 const {
-  InternalError,
   InvalidOneTimePassError,
   RPCResponse,
 } = require("../../../utils/jsonrpc");
@@ -15,10 +11,10 @@ const { instantiateCeramic } = require("../../../utils/ceramic");
 module.exports = async (req, res, next, db, id, [email, otp]) => {
   // this is hardcoded for now, with 1 app
   const appID = "did:3:12345";
-  const partialJWTClaimsThisEmail = true; // req.user.email === email;
+  const partialJWTClaimsThisEmail = req.user.email === email;
   let validOTP = true;
   try {
-    // validOTP = await validateOTP(email, otp);
+    validOTP = await validateOTP(req.user.email, otp);
   } catch (err) {
     res
       .status(400)

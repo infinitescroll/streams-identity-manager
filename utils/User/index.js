@@ -73,6 +73,7 @@ class ManagedUser extends IDX {
     }
 
     // TODO: send back 403
+    throw new Error("unauthorized");
   };
 
   appHasPermission = async (permissions, threadID, appID) => {

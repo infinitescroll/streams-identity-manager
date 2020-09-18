@@ -2,6 +2,8 @@ const DB_POLL_INTERVAL = process.env.DB_POLL_INTERVAL || 1000;
 const EMAIL_CONFIRMATION_MAX_WAIT =
   process.env.EMAIL_CONFIRMATION_MAX_WAIT || 100000;
 const SUPER_SECRET_SECRET = process.env.SUPER_SECRET_SECRET || "xxxyyyzzz";
+const JWT_SECRET = process.env.JWT_SECRET || "tttzzziiii";
+const OTP_SECRET = process.env.OTP_SECRET || "ZZiiiyyyy";
 const SHOULD_SEND_EMAIL = process.env.SHOULD_SEND_EMAIL || true;
 const EMAIL_ADDRESS = process.env.EMAIL_ADDRESS;
 const EMAIL_PASS = process.env.EMAIL_PASS;
@@ -15,6 +17,8 @@ module.exports = {
   EMAIL_ADDRESS,
   EMAIL_CONFIRMATION_MAX_WAIT,
   EMAIL_PASS,
+  JWT_SECRET,
+  OTP_SECRET,
   OTP_DB,
   SUPER_SECRET_SECRET,
   SHOULD_SEND_EMAIL,
