@@ -3,15 +3,9 @@
   "title": "Permission",
   "type": "object",
   "properties": {
-    "did": {
-      "type": "string",
-      "title": "did"
-    },
     "scopes": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+      "title": "scopes",
+      "type": "object"
     }
   }
 }
