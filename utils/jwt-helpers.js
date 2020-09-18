@@ -1,6 +1,5 @@
 const jwt = require("jsonwebtoken");
-
-const loginSecretKey = "SECRET_WAAAA";
+const { JWT_SECRET } = require("../constants");
 
 const jwtOptions = {
   issuer: "streams.re",
@@ -10,7 +9,7 @@ const jwtOptions = {
 
 const createJWT = (claims) =>
   new Promise((resolve, reject) => {
-    return jwt.sign(claims, loginSecretKey, jwtOptions, (err, token) => {
+    return jwt.sign(claims, JWT_SECRET, jwtOptions, (err, token) => {
       if (err) reject(err);
       else resolve(token);
     });
@@ -18,7 +17,7 @@ const createJWT = (claims) =>
 
 const verifyJWT = (token) =>
   new Promise((resolve, reject) => {
-    return jwt.verify(token, loginSecretKey, {}, (err, decodedToken) => {
+    return jwt.verify(token, JWT_SECRET, {}, (err, decodedToken) => {
       if (err) reject(err);
       else resolve(decodedToken);
     });

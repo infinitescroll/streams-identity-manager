@@ -53,7 +53,11 @@ app.use(function (err, req, res, next) {
   res.locals.error = req.app.get("env") === "development" ? err : {};
   const { id } = parseJsonrpcReq(req);
 
-  res.status(500).json(new RPCResponse({ id, error: new InternalError() }));
+  res
+    .status(500)
+    .json(
+      new RPCResponse({ id, error: new InternalError({ data: err.message }) })
+    );
 });
 
 module.exports = app;

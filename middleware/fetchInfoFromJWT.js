@@ -8,17 +8,24 @@ const fetchInfoFromJWT = async (req, res, next, db) => {
       const { email, did, appID } = await verifyJWT(jwt);
       req.appID = appID;
       const v = JSON.parse(await db.get(`email:${email}`));
-      if (v.did === did) {
+
+      // if the jwt contains an email and a DID, it's a full JWT
+      if (email && did) {
+        // make sure the DID and email in the token matches what we have
+        if (v.did !== did) throw new Error("Invalid JWT");
         // full jwt
         req.user = { email, did };
         next();
-      } else if (!v.did) {
-        // partial jwt
+        return;
+      }
+
+      // if the JWT contains just an email, it is a partial JWT used for getting consent
+      if (email) {
         req.user = { email, did: null };
         next();
-      } else {
-        next(new Error("Invalid JWT"));
+        return;
       }
+      next(new Error("Invalid JWT"));
     } catch (error) {
       next(error);
     }

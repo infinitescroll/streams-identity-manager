@@ -1,16 +1,29 @@
-const { authenticator } = require("otplib");
+const crypto = require("crypto");
 const level = require("level");
-const { OTP_DB } = require("../constants");
+const { OTP_DB, OTP_SECRET } = require("../constants");
+
+// none of this is compat with google authenticator...
+const generateSecret = () => crypto.randomBytes(32).toString("hex");
+const generateCode = (secret) => {
+  const valsToHash = [OTP_SECRET, secret];
+  const hash = crypto.createHash("sha256");
+  valsToHash.forEach((val) => hash.update(val, "utf8"));
+
+  const digest = hash.digest("hex");
+  return digest.slice(0, 6);
+};
+
+const validateCode = (code, secret) => code === generateCode(secret);
 
 const createOTP = async (email) => {
-  const secret = authenticator.generateSecret();
-  const otp = authenticator.generate(secret);
+  const secret = generateSecret();
+  const otp = generateCode(secret);
 
   const objToStore = { secret, time: Date.now() };
   const db = level(OTP_DB);
   await db.put(`OTP:email:${email}`, JSON.stringify(objToStore));
-  db.close();
-  return otp;
+  await db.close();
+  return { otp, secret };
 };
 
 const validateOTP = async (email, otp) => {
@@ -22,14 +35,13 @@ const validateOTP = async (email, otp) => {
       await db.close();
       const { secret, time } = JSON.parse(v);
       // TODO: validate time...
-      return authenticator.check(otp, secret);
+      return validateCode(otp, secret);
     }
-    await db.close();
     return false;
   } catch (err) {
-    console.log("Error validating OTP: ", err);
+    return false;
   } finally {
-    db.close();
+    await db.close();
   }
 };
 
