@@ -1,11 +1,17 @@
+const IdentityWallet = require("identity-wallet").default;
+const fromString = require("uint8arrays/from-string");
 const { IDX } = require("@ceramicstudio/idx");
+const nacl = require("tweetnacl");
+const naclutil = require("tweetnacl-util");
 const definitions = require("../../definitions.json");
 const schemas = require("../../publishedSchemas.json");
 const resolveDocTree = require("../ceramic/resolveDocTree");
+const getAuthSecret = require("../getAuthSecret");
 
 class ManagedUser extends IDX {
-  constructor(props) {
+  constructor({ email, ...props }) {
     super({ ...props, definitions, schemas });
+    this.email = email;
   }
 
   addPermission = async (appID, threadDocId, permissions) => {
@@ -25,14 +31,51 @@ class ManagedUser extends IDX {
     await this.set("permissions", { permissions: updatedPerms });
   };
 
-  encrypt = async (val) => {
-    // TODO
-    return val;
+  encrypt = async (string) => {
+    if (typeof string !== "string") throw new Error("must encrypt string");
+    const msg = naclutil.decodeUTF8(string);
+    const nonce = nacl.randomBytes(24);
+    const authSecret = getAuthSecret(this.email);
+    const idWallet = await IdentityWallet.create({
+      authId: this.email,
+      authSecret,
+      getPermission: () => Promise.resolve([]),
+    });
+    const key32Bytes = Uint8Array.from(idWallet._keyring._seed.slice(0, 32));
+    const ciphertext = nacl.secretbox(msg, nonce, key32Bytes);
+
+    const base64Cipher = Buffer.from(ciphertext).toString("base64");
+    const base64Nonce = Buffer.from(nonce).toString("base64");
+
+    // TODO: separate these out
+    return JSON.stringify({ ciphertext: base64Cipher, nonce: base64Nonce });
   };
 
-  decrypt = async (val) => {
-    // TODO
-    return val;
+  decrypt = async (encryptedVal) => {
+    if (typeof encryptedVal !== "string")
+      throw new Error("must encrypt string");
+    const { ciphertext, nonce } = JSON.parse(encryptedVal);
+    const authSecret = getAuthSecret(this.email);
+    const idWallet = await IdentityWallet.create({
+      authId: this.email,
+      authSecret,
+      getPermission: () => Promise.resolve([]),
+    });
+    const key32Bytes = Uint8Array.from(idWallet._keyring._seed.slice(0, 32));
+
+    try {
+      const cleartext = nacl.secretbox.open(
+        naclutil.decodeBase64(ciphertext),
+        naclutil.decodeBase64(nonce),
+        key32Bytes
+      );
+      if (cleartext == null) {
+        return null;
+      }
+      return naclutil.encodeUTF8(cleartext);
+    } catch (err) {
+      return null;
+    }
   };
 
   createDB = async (name, threadID, readKey, serviceKey, appID) => {
@@ -49,13 +92,14 @@ class ManagedUser extends IDX {
       const { databases } = await resolveDocTree(idxRoot, this.ceramic, false);
 
       const dbExists = databases.some((db) => db.threadID === threadID);
-
       // todo; send back more specific error
       if (dbExists) throw new Error("thread exists");
       const secrets = await this.ceramic.createDocument("tile", {
         content: {
-          encryptedServiceKey: await this.encrypt(serviceKey),
-          encryptedReadKey: await this.encrypt(readKey),
+          encryptedServiceKey: await this.decrypt(
+            await this.encrypt(serviceKey)
+          ),
+          encryptedReadKey: await this.decrypt(await this.encrypt(readKey)),
         },
       });
       const database = await this.ceramic.createDocument("tile", {
@@ -70,10 +114,10 @@ class ManagedUser extends IDX {
       await this.set("databases", { databases: idxRoot.databases });
 
       await this.addPermission(appID, database.id, permissions);
+    } else {
+      // TODO: send back proper RPC error
+      throw new Error("Unauthorized");
     }
-
-    // TODO: send back 403
-    throw new Error("unauthorized");
   };
 
   appHasPermission = async (permissions, threadID, appID) => {
