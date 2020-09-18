@@ -5,8 +5,8 @@ const {
 } = require("../../../utils/jsonrpc");
 const { updateUserEntryInDBWithDID } = require("../../../db");
 const { createJWT } = require("../../../utils/jwt-helpers");
-const configureUserDIDWPermissions = require("./configureUserDIDWPermissions");
 const { instantiateCeramic } = require("../../../utils/ceramic");
+const ManagedUser = require("../../../utils/User");
 
 module.exports = async (req, res, next, db, id, [email, otp]) => {
   // this is hardcoded for now, with 1 app
@@ -33,7 +33,8 @@ module.exports = async (req, res, next, db, id, [email, otp]) => {
         appID,
       });
       res.status(201).json(new RPCResponse({ id, result: { jwt, did } }));
-      configureUserDIDWPermissions(ceramic, appID);
+      const managedUser = new ManagedUser({ email, ceramic });
+      managedUser.configure(appID);
     } catch (err) {
       next(err);
     }

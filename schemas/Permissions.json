@@ -4,10 +4,7 @@
   "type": "object",
   "properties": {
     "databases": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      }
+      "type": "object"
     }
   }
 }
