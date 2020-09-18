@@ -8,21 +8,6 @@ class ManagedUser extends IDX {
     super({ ...props, definitions, schemas });
   }
 
-  _loadRawPermissions = async () => {
-    const { permissions } = await this.get("permissions", this.id);
-    return permissions;
-  };
-
-  loadPermissions = async () => {
-    const permissions = await this._loadRawPermissions();
-    return Promise.all(
-      permissions.map(async (p) => {
-        const doc = await this.ceramic.loadDocument(p);
-        return doc?.content;
-      })
-    );
-  };
-
   addPermission = async (appID, threadDocId, permissions) => {
     const updatedPerms = await Promise.all(
       permissions.map(async (p) => {
@@ -40,21 +25,6 @@ class ManagedUser extends IDX {
     await this.set("permissions", { permissions: updatedPerms });
   };
 
-  _loadRawDatabases = async () => {
-    const { databases } = await this.get("databases", this.id);
-    return databases;
-  };
-
-  loadDatabases = async () => {
-    const databases = await this._loadRawDatabases();
-    return Promise.all(
-      databases.map(async (db) => {
-        const doc = await this.ceramic.loadDocument(db);
-        return doc?.content;
-      })
-    );
-  };
-
   encrypt = async (val) => {
     // TODO
     return val;
@@ -66,11 +36,22 @@ class ManagedUser extends IDX {
   };
 
   createDB = async (name, threadID, readKey, serviceKey, appID) => {
-    const permissions = await this.loadPermissions();
+    const { permissions } = await resolveDocTree(
+      await this.get("permissions", this.id),
+      this.ceramic,
+      false
+    );
     // here we just make sure the app exists on any of the users perms, later we could check for scope
     // but for now every app with consent can at least create a database (if you're here, the app has consent)
-    const appHasPermission = permissions.some(({ did }) => did === appDID);
+    const appHasPermission = permissions.some(({ did }) => did === appID);
     if (appHasPermission) {
+      const idxRoot = await this.get("databases", this.id);
+      const { databases } = await resolveDocTree(idxRoot, this.ceramic, false);
+
+      const dbExists = databases.some((db) => db.threadID === threadID);
+
+      // todo; send back more specific error
+      if (dbExists) throw new Error("thread exists");
       const secrets = await this.ceramic.createDocument("tile", {
         content: {
           encryptedServiceKey: await this.encrypt(serviceKey),
@@ -84,11 +65,9 @@ class ManagedUser extends IDX {
           access: secrets.id,
         },
       });
+      idxRoot.databases.push(database.id);
 
-      const databases = await this._loadRawDatabases();
-      databases.push(database.id);
-
-      await this.set("databases", { databases });
+      await this.set("databases", { databases: idxRoot.databases });
 
       await this.addPermission(appID, database.id, permissions);
     }
