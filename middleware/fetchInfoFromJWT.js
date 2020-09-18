@@ -1,7 +1,7 @@
 const { verifyJWT } = require("../utils/jwt-helpers");
 
 const fetchInfoFromJWT = async (req, res, next, db) => {
-  req.user = null;
+  req.user = {};
   if (req.headers.authorization) {
     try {
       const jwt = req.headers.authorization.split(" ")[1];
