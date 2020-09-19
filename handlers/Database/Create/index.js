@@ -8,7 +8,7 @@ module.exports = async (
   _,
   __,
   id,
-  [name, threadID, readKey, serviceKey]
+  [{ name, threadID, readKey, serviceKey }]
 ) => {
   const { email } = req.user;
 

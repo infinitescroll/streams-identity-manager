@@ -6,7 +6,7 @@ const {
 const { instantiateCeramic } = require("../../../utils/ceramic");
 const ManagedUser = require("../../../utils/User");
 
-module.exports = async (req, res, _, __, id, [threadID]) => {
+module.exports = async (req, res, _, __, id, [{ threadID }]) => {
   const { email } = req.user;
   const { ceramic } = await instantiateCeramic(email);
   const managedUser = new ManagedUser({ ceramic, email });
